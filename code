@@ -1,0 +1,104 @@
+<div class="Container">
+  {% comment %} You can make per page dynamic {% endcomment %}
+  {%- assign products_per_page = 20 -%}
+
+  {%- paginate collection.products by products_per_page -%}
+
+  <div class="product-list">
+    <div class="Grid" id="AjaxinateLoop">
+      {%- for product in collection.products -%}
+        <div class="product-item">
+          <article class="ProductItem">
+            {%- if product.images.size > 0 -%}
+            {%- assign image = product.images[0] -%}
+            <a class="product-imgWrp" href="{{ product.url }}">
+              <img class="product-img Image--lazyLoad Image--fadeIn"
+                   data-src="{{ image.src | img_url: '200x200' }}"
+                   data-widths="[200, 400, 600, 800]"
+                   data-sizes="auto"
+                   alt="{{ product.title | escape }}">
+              <span class="Image__Loader"></span>
+              <noscript>
+                <img class="product-img" src="{{ image.src | img_url: '200x200' }}" alt="{{ product.title | escape }}">
+              </noscript>
+            </a>
+            {%- endif -%}
+
+            <div class="product-cont">
+              <h2 class="product-title"><a href="{{ product.url }}">{{ product.title }}</a></h2>
+              <p class="product-price">{{ product.price | money }}</p>
+            </div>
+          </article>
+        </div>
+      {%- endfor -%}
+    </div>
+  </div>
+
+  <div id="AjaxinatePagination">
+    <div class="ajax-inner">
+      {% if paginate.next %}
+      <a href="{{ paginate.next.url }}"><span class="Image__Loader"></span><span class="loading-text">Loading</span></a>
+      {% endif %}
+    </div>
+  </div>
+
+  {%- endpaginate -%}
+</div>
+
+
+<script>
+  // Infinite scrolling JavaScript code here
+let currentPage = 2;
+let moreArticlesAvailable = true;
+let isFetching = false;
+
+const container = document.querySelector('#AjaxinateLoop');
+const loadingElement = document.getElementById('AjaxinatePagination');
+const observer = new IntersectionObserver(
+  async (entries) => {
+    if (!moreArticlesAvailable || isFetching) {
+      return;
+    }
+
+    if (entries[0].isIntersecting) {
+      isFetching = true;
+      const url = '{{ paginate.next.url }}' + '?page=' + currentPage;
+
+      try {
+        const response = await fetch(url);
+        const data = await response.text();
+
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(data, 'text/html');
+        const newArticles = doc.querySelectorAll('.press-list .Grid__Cell');
+
+        if (newArticles.length === 0) {
+          moreArticlesAvailable = false;
+          const noMoreAvailableMessage = document.createElement('div');
+          noMoreAvailableMessage.textContent = 'No more available';
+          container.appendChild(noMoreAvailableMessage);
+
+          // Hide the loading element when all data is loaded
+          loadingElement.style.display = 'none';
+        } else {
+          const fragment = document.createDocumentFragment();
+          newArticles.forEach(article => {
+            fragment.appendChild(article);
+          });
+
+          container.appendChild(fragment);
+          currentPage++;
+        }
+      } catch (error) {
+        console.error('Error loading more articles:', error);
+      } finally {
+        isFetching = false;
+      }
+    }
+  },
+  { threshold: 0.1 }
+);
+
+observer.observe(loadingElement);
+
+</script>
